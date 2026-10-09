@@ -120,6 +120,66 @@ static cvar_t	*net_dropsim;
 
 static struct sockaddr	socksRelayAddr;
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+/*
+Browsers can't send UDP, so under Emscripten all IPv4 packets go over one
+WebSocket to a gateway that relays them as UDP. Each binary message is
+  [4 bytes IPv4][2 bytes port, network order][payload]
+in both directions: the destination when sending, the source when receiving.
+*/
+static cvar_t	*net_wsurl;
+static qboolean	webSocketOpen = qfalse;
+
+EM_JS(void, NET_WebOpen, (const char *url), {
+	var u = UTF8ToString(url);
+	if (!u) u = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+	var net = Module.urtNet = Module.urtNet || {};
+	if (net.ws) net.ws.close();
+	net.recv = [];
+	net.pending = [];
+	var ws = net.ws = new WebSocket(u);
+	ws.binaryType = 'arraybuffer';
+	ws.onopen = function() {
+		for (var i = 0; i < net.pending.length; i++) ws.send(net.pending[i]);
+		net.pending = [];
+	};
+	ws.onmessage = function(e) { if (net.ws === ws) net.recv.push(new Uint8Array(e.data)); };
+	ws.onclose = function() { if (net.ws === ws) { console.warn('urt: gateway connection closed'); net.ws = null; } };
+});
+
+EM_JS(void, NET_WebClose, (void), {
+	var net = Module.urtNet;
+	if (net && net.ws) { var ws = net.ws; net.ws = null; ws.close(); }
+});
+
+EM_JS(void, NET_WebSend, (const byte *ip, int port, const void *data, int length), {
+	var net = Module.urtNet;
+	if (!net || !net.ws) return;
+	var frame = new Uint8Array(6 + length);
+	frame.set(HEAPU8.subarray(ip, ip + 4), 0);
+	frame[4] = (port >> 8) & 0xff;
+	frame[5] = port & 0xff;
+	frame.set(HEAPU8.subarray(data, data + length), 6);
+	if (net.ws.readyState === 1) net.ws.send(frame);
+	else if (net.ws.readyState === 0) net.pending.push(frame);
+});
+
+// Returns the payload length (0 if the queue is empty), -1 for a bad frame.
+EM_JS(int, NET_WebRecv, (byte *ip, int *port, void *data, int maxsize), {
+	var net = Module.urtNet;
+	if (!net || !net.recv.length) return 0;
+	var frame = net.recv.shift();
+	var length = frame.length - 6;
+	if (length < 0 || length > maxsize) return -1;
+	HEAPU8.set(frame.subarray(0, 4), ip);
+	HEAP32[port >> 2] = (frame[4] << 8) | frame[5];
+	HEAPU8.set(frame.subarray(6), data);
+	return length;
+});
+#endif
+
 static SOCKET	ip_socket = INVALID_SOCKET;
 static SOCKET	ip6_socket = INVALID_SOCKET;
 static SOCKET	socks_socket = INVALID_SOCKET;
@@ -656,6 +716,12 @@ void Sys_SendPacket( int length, const void *data, netadr_t to ) {
 		Com_Error( ERR_FATAL, "Sys_SendPacket: bad address type" );
 		return;
 	}
+
+#ifdef __EMSCRIPTEN__
+	if( to.type == NA_IP && webSocketOpen )
+		NET_WebSend( to.ip, BigShort( to.port ) & 0xffff, data, length );
+	return;
+#endif
 
 	if( (ip_socket == INVALID_SOCKET && to.type == NA_IP) ||
 		(ip_socket == INVALID_SOCKET && to.type == NA_BROADCAST) ||
@@ -1360,6 +1426,14 @@ void NET_OpenIP( void ) {
 	int		port;
 	int		port6;
 
+#ifdef __EMSCRIPTEN__
+	if( net_enabled->integer & NET_ENABLEV4 ) {
+		NET_WebOpen( net_wsurl->string );
+		webSocketOpen = qtrue;
+	}
+	return;
+#endif
+
 	port = net_port->integer;
 	port6 = net_port6->integer;
 
@@ -1438,6 +1512,13 @@ static qboolean NET_GetCvars( void ) {
 
 	net_ip = Cvar_Get( "net_ip", "0.0.0.0", CVAR_LATCH );
 	modified += net_ip->modified;
+
+#ifdef __EMSCRIPTEN__
+	// WebSocket URL of the UDP gateway; empty means ws(s)://<page host>/ws
+	net_wsurl = Cvar_Get( "net_wsurl", "", CVAR_LATCH );
+	modified += net_wsurl->modified;
+	net_wsurl->modified = qfalse;
+#endif
 	net_ip->modified = qfalse;
 	
 	net_ip6 = Cvar_Get( "net_ip6", "::", CVAR_LATCH );
@@ -1536,6 +1617,12 @@ void NET_Config( qboolean enableNetworking ) {
 	}
 
 	if( stop ) {
+#ifdef __EMSCRIPTEN__
+		if ( webSocketOpen ) {
+			NET_WebClose();
+			webSocketOpen = qfalse;
+		}
+#endif
 		if ( ip_socket != INVALID_SOCKET ) {
 			closesocket( ip_socket );
 			ip_socket = INVALID_SOCKET;
@@ -1659,6 +1746,42 @@ NET_Sleep
 Sleeps msec or until something happens on the network
 ====================
 */
+#ifdef __EMSCRIPTEN__
+// The browser drives the frame loop, so never block; just drain the WebSocket queue.
+void NET_Sleep(int msec)
+{
+	byte bufData[MAX_MSGLEN + 1];
+	byte ip[4];
+	netadr_t from;
+	msg_t netmsg;
+	int port, ret;
+
+	while(webSocketOpen)
+	{
+		MSG_Init(&netmsg, bufData, sizeof(bufData));
+		ret = NET_WebRecv(ip, &port, netmsg.data, netmsg.maxsize);
+		if(ret == 0)
+			break;
+		if(ret < 0)
+			continue;
+
+		Com_Memset(&from, 0, sizeof(from));
+		from.type = NA_IP;
+		Com_Memcpy(from.ip, ip, 4);
+		from.port = BigShort((short)port);
+		netmsg.cursize = ret;
+
+		if(net_dropsim->value > 0.0f && net_dropsim->value <= 100.0f
+			&& rand() < (int) (((double) RAND_MAX) / 100.0 * (double) net_dropsim->value))
+			continue;
+
+		if(com_sv_running->integer)
+			Com_RunAndTimeServerPacket(&from, &netmsg);
+		else
+			CL_PacketEvent(from, &netmsg);
+	}
+}
+#else
 void NET_Sleep(int msec)
 {
 	struct timeval timeout;
@@ -1704,6 +1827,8 @@ void NET_Sleep(int msec)
 	else if(retval > 0)
 		NET_Event(&fdr);
 }
+
+#endif
 
 /*
 ====================
