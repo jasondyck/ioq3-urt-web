@@ -267,8 +267,12 @@ static void GLSL_GetShaderHeader( GLenum shaderType, const GLchar *extra, char *
 
 		if (qglesMajorVersion >= 2)
 		{
-			Q_strcat(dest, size, "precision mediump float;\n");
-			Q_strcat(dest, size, "precision mediump sampler2DShadow;\n");
+			// highp is required: positions and view vectors are hundreds of
+			// units long and their squared lengths overflow fp16, which drivers
+			// that honor mediump (e.g. Mesa on AMD, mobile GPUs) really use.
+			// GLSL ES 3.00 guarantees highp in fragment shaders.
+			Q_strcat(dest, size, "precision highp float;\n");
+			Q_strcat(dest, size, "precision highp sampler2DShadow;\n");
 		}
 
 		if(shaderType == GL_VERTEX_SHADER)
@@ -298,7 +302,8 @@ static void GLSL_GetShaderHeader( GLenum shaderType, const GLchar *extra, char *
 				Q_strcat(dest, size, extra);
 			}
 
-			Q_strcat(dest, size, "precision mediump float;\n");
+			// see the GLSL ES 3.00 case above for why highp matters
+			Q_strcat(dest, size, "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n");
 
 			if (glRefConfig.shadowSamplers)
 			{
