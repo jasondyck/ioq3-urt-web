@@ -318,6 +318,11 @@ static Q_NO_RETURN void Sys_Exit( int exitCode )
 
 	Sys_PlatformExit( );
 
+#ifdef __EMSCRIPTEN__
+	// The main loop keeps the runtime alive, so exit() would only stop the
+	// frame loop (a black canvas) without calling Module.onExit.
+	emscripten_force_exit( exitCode );
+#endif
 	exit( exitCode );
 }
 
