@@ -33,6 +33,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../client/client.h"
 #include "../sys/sys_local.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/html5.h>
+#endif
+
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #define KMOD_SCROLL KMOD_RESERVED
 #endif
@@ -1117,7 +1121,32 @@ static void IN_ProcessEvents( void )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
 						break;
+#ifdef __EMSCRIPTEN__
+					{
+						// SDL scales pointer-lock movement by render size / CSS size, so
+						// sensitivity would follow the lobby's resolution and the screen's
+						// pixel density. Undo it: count movement in CSS pixels, like the
+						// desktop game counts it in screen points.
+						static float residualX, residualY;
+						double cssW, cssH;
+						float k = 1.0f;
+						int dx, dy;
+
+						if( emscripten_get_element_css_size( "#canvas", &cssW, &cssH ) == EMSCRIPTEN_RESULT_SUCCESS &&
+							cssW > 0 && cls.glconfig.vidWidth > 0 )
+							k = cssW / cls.glconfig.vidWidth;
+						residualX += e.motion.xrel * k;
+						residualY += e.motion.yrel * k;
+						dx = (int)residualX;
+						dy = (int)residualY;
+						residualX -= dx;
+						residualY -= dy;
+						if( dx || dy )
+							Com_QueueEvent( in_eventTime, SE_MOUSE, dx, dy, 0, NULL );
+					}
+#else
 					Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+#endif
 				}
 				break;
 
@@ -1267,6 +1296,35 @@ void IN_Frame( void )
 		IN_ActivateMouse( cls.glconfig.isFullscreen );
 
 	IN_ProcessEvents( );
+
+#ifdef __EMSCRIPTEN__
+	{
+		// Safari can't keep Esc from the browser: it drops pointer lock (and
+		// fullscreen) without the game ever seeing the key, so a second press was
+		// needed for the menu. When lock is lost mid-game and nothing has opened a
+		// menu or the console a moment later, press Esc for the player. The wait
+		// lets a real Esc (Chrome with keyboard lock) land first so it isn't doubled.
+		static qboolean wasLocked;
+		static int lostTime;
+		EmscriptenPointerlockChangeEvent pl;
+		qboolean locked = emscripten_get_pointerlock_status( &pl ) == EMSCRIPTEN_RESULT_SUCCESS && pl.isActive;
+
+		if( wasLocked && !locked && mouseActive && clc.state == CA_ACTIVE )
+			lostTime = Sys_Milliseconds( );
+		else if( locked )
+			lostTime = 0;
+		if( lostTime && Sys_Milliseconds( ) - lostTime > 150 )
+		{
+			if( !Key_GetCatcher( ) )
+			{
+				Com_QueueEvent( in_eventTime, SE_KEY, K_ESCAPE, qtrue, 0, NULL );
+				Com_QueueEvent( in_eventTime, SE_KEY, K_ESCAPE, qfalse, 0, NULL );
+			}
+			lostTime = 0;
+		}
+		wasLocked = locked;
+	}
+#endif
 
 	// Set event time for next frame to earliest possible time an event could happen
 	in_eventTime = Sys_Milliseconds( );
