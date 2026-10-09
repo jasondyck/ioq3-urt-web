@@ -32,6 +32,7 @@ typedef struct {
 	char			servername[MAX_STRING_CHARS];
 	char			updateInfoString[MAX_STRING_CHARS];
 	char			messageString[MAX_STRING_CHARS];
+	char			serverAddress[MAX_STRING_CHARS];	// Urban Terror 4.x
 } uiClientState_t;
 
 typedef enum {
@@ -124,6 +125,14 @@ typedef enum {
 	// 1.32
 	UI_FS_SEEK,
 	UI_SET_PBCLSTATUS,
+
+	// Urban Terror 4.x auth syscalls (ioUrbanTerror engine)
+	UI_NET_STRINGTOADR,
+	UI_Q_VSNPRINTF,
+	UI_NET_SENDPACKET,
+	UI_COPYSTRING,
+	UI_SYS_STARTPROCESS,
+	UI_NET_COMPAREBASEADR,
 
 	UI_MEMSET = 100,
 	UI_MEMCPY,

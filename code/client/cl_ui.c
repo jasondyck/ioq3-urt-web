@@ -39,6 +39,8 @@ static void GetClientState( uiClientState_t *state ) {
 	Q_strncpyz( state->servername, clc.servername, sizeof( state->servername ) );
 	Q_strncpyz( state->updateInfoString, cls.updateInfoString, sizeof( state->updateInfoString ) );
 	Q_strncpyz( state->messageString, clc.serverMessage, sizeof( state->messageString ) );
+	Q_strncpyz( state->serverAddress, NET_AdrToString( clc.serverAddress ), sizeof( state->serverAddress ) );
+
 	state->clientNum = cl.snap.ps.clientNum;
 }
 
@@ -1071,6 +1073,43 @@ intptr_t CL_UISystemCalls( intptr_t *args ) {
 
 	case UI_VERIFY_CDKEY:
 		return CL_CDKeyValidate(VMA(1), VMA(2));
+
+	// Urban Terror 4.x auth syscalls. The UI VM's netadr_t is the
+	// ioUrbanTerror layout { int type; byte ip[4]; unsigned short port; }.
+	case UI_NET_STRINGTOADR:
+		{
+			netadr_t addr;
+			byte *out = VMA(2);
+			int ok = NET_StringToAdr( VMA(1), &addr, NA_IP );
+			if ( ok ) {
+				*(int *)out = addr.type;
+				Com_Memcpy( out + 4, addr.ip, 4 );
+				Com_Memcpy( out + 8, &addr.port, 2 );
+			}
+			return ok;
+		}
+
+	case UI_Q_VSNPRINTF:
+		// The VM's va_list can't be used natively; only the auth code
+		// calls this and auth is disabled, so return an empty string.
+		if ( *(int *)VMA(2) > 0 )
+			*(char *)VMA(1) = '\0';
+		return 0;
+
+	case UI_NET_SENDPACKET:
+		{
+			netadr_t addr;
+			if ( NET_StringToAdr( VMA(4), &addr, NA_IP ) )
+				NET_SendPacket( args[1], args[2], VMA(3), addr );
+		}
+		return 0;
+
+	case UI_COPYSTRING:
+	case UI_SYS_STARTPROCESS:
+		return 0;
+
+	case UI_NET_COMPAREBASEADR:
+		return 0;
 		
 	default:
 		Com_Error( ERR_DROP, "Bad UI system trap: %ld", (long int) args[0] );

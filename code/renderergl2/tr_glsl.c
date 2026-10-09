@@ -1467,8 +1467,9 @@ void GLSL_InitGPUShaders(void)
 	numEtcShaders++;
 
 	// GLSL 1.10+ or GL_OES_standard_derivatives extension are required for dFdx() and dFdy() GLSL functions
-	if (glRefConfig.glslMajorVersion > 1 || (glRefConfig.glslMajorVersion == 1 && glRefConfig.glslMinorVersion >= 10)
-	    || glRefConfig.standardDerivatives)
+	// Only built when r_ssao is enabled (latched); it fails to compile under some WebGL drivers.
+	if (r_ssao->integer && (glRefConfig.glslMajorVersion > 1 || (glRefConfig.glslMajorVersion == 1 && glRefConfig.glslMinorVersion >= 10)
+	    || glRefConfig.standardDerivatives))
 	{
 		attribs = ATTR_POSITION | ATTR_TEXCOORD;
 		extradefines[0] = '\0';
