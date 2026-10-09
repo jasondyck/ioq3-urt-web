@@ -147,6 +147,9 @@ void R_LoadJPG( const char *name, byte **pic, int *width, int *height );
 void R_LoadPCX( const char *name, byte **pic, int *width, int *height );
 void R_LoadPNG( const char *name, byte **pic, int *width, int *height );
 void R_LoadPVR( const char *name, byte **pic, int *width, int *height );
+#ifdef USE_WEBP
+void R_LoadWEBP( const char *name, byte **pic, int *width, int *height );
+#endif
 void R_LoadTGA( const char *name, byte **pic, int *width, int *height );
 
 /*

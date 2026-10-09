@@ -15,11 +15,14 @@ set(USE_OPENAL_DLOPEN OFF CACHE INTERNAL "")
 set(BUILD_GAME_LIBRARIES OFF CACHE INTERNAL "")
 set(USE_HTTP OFF CACHE INTERNAL "")
 
+# All current browsers support wasm SIMD; lets the compiler vectorize
+add_compile_options(-msimd128)
+
 # Disable LTO since the libraries Emscripten provides aren't LTO enabled
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
 
 list(APPEND CLIENT_LINK_OPTIONS
-    -sINITIAL_MEMORY=512MB
+    -sINITIAL_MEMORY=128MB
     -sALLOW_MEMORY_GROWTH=1
     -sMAXIMUM_MEMORY=2GB
     -sSTACK_SIZE=5MB

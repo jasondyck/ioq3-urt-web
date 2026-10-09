@@ -316,11 +316,13 @@ void GL_CheckErrs( char *file, int line ) {
 	int		err;
 	char	s[64];
 
-	err = qglGetError();
-	if ( err == GL_NO_ERROR ) {
+	// glGetError stalls until the GPU catches up (very costly under WebGL),
+	// so don't call it at all when errors are ignored, the default
+	if ( r_ignoreGLErrors->integer ) {
 		return;
 	}
-	if ( r_ignoreGLErrors->integer ) {
+	err = qglGetError();
+	if ( err == GL_NO_ERROR ) {
 		return;
 	}
 	switch( err ) {

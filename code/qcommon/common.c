@@ -1449,7 +1449,13 @@ void Com_InitZoneMemory( void ) {
 		s_zoneTotal = cv->integer * 1024 * 1024;
 	}
 
+#ifdef __EMSCRIPTEN__
+	// Fresh wasm memory is already zero and Hunk_Alloc/Z_Malloc clear what they
+	// hand out, so skip calloc's memset: untouched pages then cost no real RAM.
+	mainzone = malloc( s_zoneTotal );
+#else
 	mainzone = calloc( s_zoneTotal, 1 );
+#endif
 	if ( !mainzone ) {
 		Com_Error( ERR_FATAL, "Zone data failed to allocate %i megs", s_zoneTotal / (1024*1024) );
 	}
@@ -1578,7 +1584,13 @@ void Com_InitHunkMemory( void ) {
 		s_hunkTotal = cv->integer * 1024 * 1024;
 	}
 
+#ifdef __EMSCRIPTEN__
+	// Fresh wasm memory is already zero and Hunk_Alloc/Z_Malloc clear what they
+	// hand out, so skip calloc's memset: untouched pages then cost no real RAM.
+	s_hunkData = malloc( s_hunkTotal + 31 );
+#else
 	s_hunkData = calloc( s_hunkTotal + 31, 1 );
+#endif
 	if ( !s_hunkData ) {
 		Com_Error( ERR_FATAL, "Hunk data failed to allocate %i megs", s_hunkTotal / (1024*1024) );
 	}

@@ -927,7 +927,10 @@ static imageExtToLoaderMap_t imageLoaders[ ] =
 	{ "png",  R_LoadPNG },
 	{ "pcx",  R_LoadPCX },
 	{ "bmp",  R_LoadBMP },
-	{ "pvr",  R_LoadPVR }
+	{ "pvr",  R_LoadPVR },
+#ifdef USE_WEBP
+	{ "webp", R_LoadWEBP },
+#endif
 };
 
 static int numImageLoaders = ARRAY_LEN( imageLoaders );

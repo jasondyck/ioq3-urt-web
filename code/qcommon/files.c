@@ -1078,6 +1078,38 @@ Returns filesize and an open FILE pointer.
 */
 extern qboolean		com_fullyInitialized;
 
+#ifdef __EMSCRIPTEN__
+/*
+===========
+FS_WebSkipDir
+
+In the browser every game asset comes from a pk3 and each failed fopen() is a
+slow walk through Emscripten's JS filesystem; image and sound lookups try many
+extensions, so missing-file probes dominated map load time. Skip the directory
+search for asset types. maps/ stays searchable: cgame writes generated
+minimaps there.
+===========
+*/
+static qboolean FS_WebSkipDir( const char *filename )
+{
+	static const char *assetExts[] = {
+		".tga", ".jpg", ".jpeg", ".png", ".webp", ".pcx", ".bmp", ".pvr", ".dds",
+		".wav", ".ogg", ".opus", ".md3", ".mdr", ".iqm", ".skin", ".shader", ".roq"
+	};
+	int len = strlen( filename );
+	int i;
+
+	if ( !Q_stricmpn( filename, "maps/", 5 ) )
+		return qfalse;
+
+	for ( i = 0; i < ARRAY_LEN( assetExts ); i++ ) {
+		if ( FS_IsExt( filename, assetExts[i], len ) )
+			return qtrue;
+	}
+	return qfalse;
+}
+#endif
+
 long FS_FOpenFileReadDir(const char *filename, searchpath_t *search, fileHandle_t *file, qboolean uniqueFILE, qboolean unpure)
 {
 	long			hash;
@@ -1156,6 +1188,10 @@ long FS_FOpenFileReadDir(const char *filename, searchpath_t *search, fileHandle_
 		}
 		else if(search->dir)
 		{
+#ifdef __EMSCRIPTEN__
+			if(FS_WebSkipDir(filename))
+				return 0;
+#endif
 			dir = search->dir;
 
 			netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
@@ -1291,6 +1327,13 @@ long FS_FOpenFileReadDir(const char *filename, searchpath_t *search, fileHandle_
 			}
 		}
 
+#ifdef __EMSCRIPTEN__
+		if(FS_WebSkipDir(filename))
+		{
+			*file = 0;
+			return -1;
+		}
+#endif
 		dir = search->dir;
 
 		netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
