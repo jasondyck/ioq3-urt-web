@@ -29,6 +29,7 @@ set(COMMON_SOURCES
     ${SOURCE_DIR}/qcommon/vm_powerpc.c
     ${SOURCE_DIR}/qcommon/vm_sparc.c
     ${SOURCE_DIR}/qcommon/vm_x86.c
+    ${SOURCE_DIR}/qcommon/vm_wasm.c
 )
 
 disable_warnings(

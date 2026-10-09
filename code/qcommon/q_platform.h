@@ -320,6 +320,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define ARCH_STRING "wasm32"
 
+// QVMs are translated to wasm modules at load time (vm_wasm.c)
+#define HAVE_VM_COMPILED
+
 #define Q3_LITTLE_ENDIAN
 
 #define DLL_EXT ".wasm"
