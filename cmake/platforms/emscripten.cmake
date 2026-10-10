@@ -29,7 +29,7 @@ list(APPEND CLIENT_LINK_OPTIONS
     -sSTACK_SIZE=5MB
     -sMIN_WEBGL_VERSION=1
     -sMAX_WEBGL_VERSION=2
-    -sEXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency
+    -sEXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency,ccall
     -sEXIT_RUNTIME=1
     -sEXPORT_ES6
     -sEXPORT_NAME=${CLIENT_NAME}

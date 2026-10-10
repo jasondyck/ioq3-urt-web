@@ -1044,6 +1044,30 @@ int SV_FrameMsec(void)
 		return 1;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/*
+==================
+SV_WebPlayerCount
+
+Connected human players, for the page's public game listing.
+==================
+*/
+EMSCRIPTEN_KEEPALIVE int SV_WebPlayerCount( void ) {
+	int i, n = 0;
+
+	if ( !com_sv_running->integer || !svs.clients ) {
+		return 0;
+	}
+	for ( i = 0; i < sv_maxclients->integer; i++ ) {
+		if ( svs.clients[i].state >= CS_CONNECTED && svs.clients[i].netchan.remoteAddress.type != NA_BOT ) {
+			n++;
+		}
+	}
+	return n;
+}
+#endif
+
 /*
 ==================
 SV_Frame

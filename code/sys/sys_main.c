@@ -795,6 +795,12 @@ EMSCRIPTEN_KEEPALIVE void Sys_WebBackgroundFrame( void )
 {
 	Com_Frame( );
 }
+
+// Lets the page read cvars (e.g. the current map of a game it hosts).
+EMSCRIPTEN_KEEPALIVE const char *Sys_WebCvar( const char *name )
+{
+	return Cvar_VariableString( name );
+}
 #endif
 
 /*
