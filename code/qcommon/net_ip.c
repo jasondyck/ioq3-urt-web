@@ -128,6 +128,10 @@ Browsers can't send UDP, so under Emscripten all IPv4 packets go over one
 WebSocket to a gateway that relays them as UDP. Each binary message is
   [4 bytes IPv4][2 bytes port, network order][payload]
 in both directions: the destination when sending, the source when receiving.
+
+The page can supply its own transport instead (Module.urtTransport, e.g.
+WebRTC data channels between browsers): open(onFrame) returns an object with
+readyState, send(frame) and close(), and frames use the same layout.
 */
 static cvar_t	*net_wsurl;
 static qboolean	webSocketOpen = qfalse;
@@ -139,6 +143,10 @@ EM_JS(void, NET_WebOpen, (const char *url), {
 	if (net.ws) net.ws.close();
 	net.recv = [];
 	net.pending = [];
+	if (Module.urtTransport) {
+		var t = net.ws = Module.urtTransport.open(function(frame) { if (net.ws === t) net.recv.push(frame); });
+		return;
+	}
 	var ws = net.ws = new WebSocket(u);
 	ws.binaryType = 'arraybuffer';
 	ws.onopen = function() {

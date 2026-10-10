@@ -782,6 +782,21 @@ void Sys_SigHandler( int signal )
 		Sys_Exit( 2 );
 }
 
+#ifdef __EMSCRIPTEN__
+/*
+=================
+Sys_WebBackgroundFrame
+
+Browsers stop requestAnimationFrame in hidden tabs, which would freeze a
+game this browser is hosting; the page calls this from a timer meanwhile.
+=================
+*/
+EMSCRIPTEN_KEEPALIVE void Sys_WebBackgroundFrame( void )
+{
+	Com_Frame( );
+}
+#endif
+
 /*
 =================
 main
