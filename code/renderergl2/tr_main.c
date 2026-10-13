@@ -677,7 +677,7 @@ Set up the culling frustum planes for the current view using the results we got 
 the projection matrix.
 =================
 */
-void R_SetupFrustum (viewParms_t *dest, float xmin, float xmax, float ymax, float zProj, float zFar, float stereoSep)
+void R_SetupFrustum (viewParms_t *dest, float xmin, float xmax, float ymin, float ymax, float zProj, float zFar, float stereoSep)
 {
 	vec3_t ofsorigin;
 	float oppleg, adjleg, length;
@@ -715,15 +715,13 @@ void R_SetupFrustum (viewParms_t *dest, float xmin, float xmax, float ymax, floa
 		VectorMA(dest->frustum[1].normal, -zProj / length, dest->or.axis[1], dest->frustum[1].normal);
 	}
 
+	length = sqrt(ymin * ymin + zProj * zProj);
+	VectorScale(dest->or.axis[0], -ymin / length, dest->frustum[2].normal);
+	VectorMA(dest->frustum[2].normal, zProj / length, dest->or.axis[2], dest->frustum[2].normal);
+
 	length = sqrt(ymax * ymax + zProj * zProj);
-	oppleg = ymax / length;
-	adjleg = zProj / length;
-
-	VectorScale(dest->or.axis[0], oppleg, dest->frustum[2].normal);
-	VectorMA(dest->frustum[2].normal, adjleg, dest->or.axis[2], dest->frustum[2].normal);
-
-	VectorScale(dest->or.axis[0], oppleg, dest->frustum[3].normal);
-	VectorMA(dest->frustum[3].normal, -adjleg, dest->or.axis[2], dest->frustum[3].normal);
+	VectorScale(dest->or.axis[0], ymax / length, dest->frustum[3].normal);
+	VectorMA(dest->frustum[3].normal, -zProj / length, dest->or.axis[2], dest->frustum[3].normal);
 	
 	for (i=0 ; i<4 ; i++) {
 		dest->frustum[i].type = PLANE_NON_AXIAL;
@@ -770,11 +768,21 @@ void R_SetupProjection(viewParms_t *dest, float zProj, float zFar, qboolean comp
 			stereoSep = 0;
 	}
 
-	ymax = zProj * tan(dest->fovY * M_PI / 360.0f);
-	ymin = -ymax;
+	if(dest->asymmetric)
+	{
+		xmin = zProj * dest->frustumTan[0];
+		xmax = zProj * dest->frustumTan[1];
+		ymin = zProj * dest->frustumTan[2];
+		ymax = zProj * dest->frustumTan[3];
+	}
+	else
+	{
+		ymax = zProj * tan(dest->fovY * M_PI / 360.0f);
+		ymin = -ymax;
 
-	xmax = zProj * tan(dest->fovX * M_PI / 360.0f);
-	xmin = -xmax;
+		xmax = zProj * tan(dest->fovX * M_PI / 360.0f);
+		xmin = -xmax;
+	}
 
 	width = xmax - xmin;
 	height = ymax - ymin;
@@ -796,7 +804,7 @@ void R_SetupProjection(viewParms_t *dest, float zProj, float zFar, qboolean comp
 	
 	// Now that we have all the data for the projection matrix we can also setup the view frustum.
 	if(computeFrustum)
-		R_SetupFrustum(dest, xmin, xmax, ymax, zProj, zFar, stereoSep);
+		R_SetupFrustum(dest, xmin, xmax, ymin, ymax, zProj, zFar, stereoSep);
 }
 
 /*

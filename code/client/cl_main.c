@@ -3557,6 +3557,9 @@ void CL_Init( void ) {
 	cls.realtime = 0;
 
 	CL_InitInput ();
+#ifdef __EMSCRIPTEN__
+	CL_WebXRInit ();
+#endif
 
 	//
 	// register our variables

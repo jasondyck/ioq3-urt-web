@@ -597,6 +597,11 @@ usercmd_t CL_CreateCmd( void ) {
 	// get basic movement from joystick
 	CL_JoystickMove( &cmd );
 
+#ifdef __EMSCRIPTEN__
+	// headset and VR controllers
+	CL_WebXRMove( &cmd, frame_msec );
+#endif
+
 	// check to make sure the angles haven't wrapped
 	if ( cl.viewangles[PITCH] - oldAngles[PITCH] > 90 ) {
 		cl.viewangles[PITCH] = oldAngles[PITCH] + 90;
