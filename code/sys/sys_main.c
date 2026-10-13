@@ -796,6 +796,19 @@ EMSCRIPTEN_KEEPALIVE void Sys_WebBackgroundFrame( void )
 	Com_Frame( );
 }
 
+// While the page has a VR session, the headset's frames run the engine
+// (see client/xr.js); the browser's would be extra frames, so skip them.
+// (Pausing emscripten's main loop instead exits the runtime.)
+EM_JS( int, Sys_WebXRRunsFrames, (), {
+	return Module.urtXR ? 1 : 0;
+} );
+
+static void Sys_WebFrame( void )
+{
+	if ( !Sys_WebXRRunsFrames( ) )
+		Com_Frame( );
+}
+
 // Lets the page read cvars (e.g. the current map of a game it hosts).
 EMSCRIPTEN_KEEPALIVE const char *Sys_WebCvar( const char *name )
 {
@@ -914,7 +927,7 @@ int main( int argc, char **argv )
 	signal( SIGINT, Sys_SigHandler );
 
 #ifdef __EMSCRIPTEN__
-	emscripten_set_main_loop( Com_Frame, 0, 1 );
+	emscripten_set_main_loop( Sys_WebFrame, 0, 1 );
 #else
 	while( 1 )
 	{

@@ -640,8 +640,17 @@ void	RB_SetGL2D (void) {
 	}
 
 	// set 2D virtual screen size
-	qglViewport( 0, 0, width, height );
-	qglScissor( 0, 0, width, height );
+#ifdef __EMSCRIPTEN__
+	if ( webxrView.active ) {
+		// a VR eye: the HUD and menus go in a window in the middle of the view
+		qglViewport( webxrView.hud[0], webxrView.hud[1], webxrView.hud[2], webxrView.hud[3] );
+		qglScissor( webxrView.hud[0], webxrView.hud[1], webxrView.hud[2], webxrView.hud[3] );
+	} else
+#endif
+	{
+		qglViewport( 0, 0, width, height );
+		qglScissor( 0, 0, width, height );
+	}
 
 	Mat4Ortho(0, width, height, 0, 0, 1, matrix);
 	GL_SetProjectionMatrix(matrix);
@@ -1223,6 +1232,21 @@ const void	*RB_DrawBuffer( const void *data ) {
 		FBO_Bind(NULL);
 
 	qglDrawBuffer( cmd->buffer );
+
+#ifdef __EMSCRIPTEN__
+	// A VR eye: both eyes are drawn on the same canvas, and menus without the
+	// world don't cover all of it, so start from black.
+	if ( webxrView.active ) {
+		qglScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
+		qglClearColor( 0, 0, 0, 1 );
+		qglClear( GL_COLOR_BUFFER_BIT );
+		if ( glRefConfig.framebufferObject && tr.renderFbo ) {
+			FBO_Bind( tr.renderFbo );
+			qglClear( GL_COLOR_BUFFER_BIT );
+			FBO_Bind( NULL );
+		}
+	}
+#endif
 
 	// clear screen for debugging
 	if ( r_clear->integer ) {

@@ -444,6 +444,64 @@ void RE_EndScene(void)
 	r_firstScenePoly = r_numpolys;
 }
 
+#ifdef __EMSCRIPTEN__
+/*
+@@@@@@@@@@@@@@@@@@@@@
+R_WebXRView
+
+Turns the game's view into the VR eye being drawn (see tr_webxr.h). Its yaw and
+pitch already follow the head; add the head's roll and position and the eye's
+offset, and the headset's own (off-center) frustum.
+@@@@@@@@@@@@@@@@@@@@@
+*/
+static void R_WebXRView( viewParms_t *parms, const refdef_t *fd ) {
+	const float *axis0 = fd->viewaxis[0];
+	vec3_t angles, shift;
+	float turn, zoom = 1.0f;
+	int i;
+
+	if ( fd->rdflags & RDF_NOWORLDMODEL ) {
+		// a model in the HUD or a menu: goes where the 2D goes
+		float sx = (float)webxrView.hud[2] / glConfig.vidWidth;
+		float sy = (float)webxrView.hud[3] / glConfig.vidHeight;
+
+		parms->viewportX = webxrView.hud[0] + parms->viewportX * sx;
+		parms->viewportY = webxrView.hud[1] + parms->viewportY * sy;
+		parms->viewportWidth *= sx;
+		parms->viewportHeight *= sy;
+		return;
+	}
+
+	angles[PITCH] = RAD2DEG( asin( Com_Clamp( -1.0f, 1.0f, -axis0[2] ) ) );
+	angles[YAW] = RAD2DEG( atan2( axis0[1], axis0[0] ) );
+	angles[ROLL] = RAD2DEG( atan2( fd->viewaxis[1][2], fd->viewaxis[2][2] ) ) + webxrView.headAngles[ROLL];
+	AnglesToAxis( angles, parms->or.axis );
+
+	// head movement is measured in the headset's space; turn it the way the game
+	// has turned the player relative to that
+	turn = DEG2RAD( angles[YAW] - webxrView.headAngles[YAW] );
+	shift[0] = webxrView.headShift[0] * cos( turn ) - webxrView.headShift[1] * sin( turn );
+	shift[1] = webxrView.headShift[0] * sin( turn ) + webxrView.headShift[1] * cos( turn );
+	shift[2] = webxrView.headShift[2];
+	VectorAdd( fd->vieworg, shift, parms->or.origin );
+	for ( i = 0; i < 3; i++ ) {
+		VectorMA( parms->or.origin, webxrView.eyeOffset[i], parms->or.axis[i], parms->or.origin );
+	}
+
+	// a scope narrows the game's field of view; narrow the headset's alike
+	if ( webxrView.baseFov > 1.0f && fd->fov_x < webxrView.baseFov - 1.0f ) {
+		zoom = tan( DEG2RAD( fd->fov_x * 0.5f ) ) / tan( DEG2RAD( webxrView.baseFov * 0.5f ) );
+	}
+	parms->asymmetric = qtrue;
+	for ( i = 0; i < 4; i++ ) {
+		parms->frustumTan[i] = webxrView.tan[i] * zoom;
+	}
+	// a symmetric field of view as wide, for the effects that use one
+	parms->fovX = RAD2DEG( 2.0f * atan( ( parms->frustumTan[1] - parms->frustumTan[0] ) * 0.5f ) );
+	parms->fovY = RAD2DEG( 2.0f * atan( ( parms->frustumTan[3] - parms->frustumTan[2] ) * 0.5f ) );
+}
+#endif
+
 /*
 @@@@@@@@@@@@@@@@@@@@@
 RE_RenderScene
@@ -556,6 +614,12 @@ void RE_RenderScene( const refdef_t *fd ) {
 	VectorCopy( fd->viewaxis[2], parms.or.axis[2] );
 
 	VectorCopy( fd->vieworg, parms.pvsOrigin );
+
+#ifdef __EMSCRIPTEN__
+	if ( webxrView.active ) {
+		R_WebXRView( &parms, fd );
+	}
+#endif
 
 	if(!( fd->rdflags & RDF_NOWORLDMODEL ) && r_depthPrepass->value && ((r_forceSun->integer) || tr.sunShadows))
 	{

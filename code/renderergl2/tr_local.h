@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_common.h"
+#include "../renderercommon/tr_webxr.h"
 #include "tr_extratypes.h"
 #include "tr_extramath.h"
 #include "tr_fbo.h"
@@ -841,6 +842,8 @@ typedef struct {
 	int         targetFboLayer;
 	int         targetFboCubemapIndex;
 	float		fovX, fovY;
+	qboolean	asymmetric;			// frustum from frustumTan instead of fovX/fovY (a VR eye)
+	float		frustumTan[4];		// left, right, down, up
 	float		projectionMatrix[16];
 	cplane_t	frustum[5];
 	vec3_t		visBounds[2];

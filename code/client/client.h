@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../renderercommon/tr_public.h"
+#include "../renderercommon/tr_webxr.h"
 #include "../ui/ui_public.h"
 #include "keys.h"
 #include "snd_public.h"
@@ -503,6 +504,18 @@ void CL_ReadPackets (void);
 
 void CL_WritePacket( void );
 void IN_CenterView (void);
+
+#ifdef __EMSCRIPTEN__
+//
+// cl_webxr.c
+//
+void CL_WebXRInit( void );
+qboolean CL_WebXRActive( void );
+void CL_WebXRFrame( void );
+void CL_WebXRMove( usercmd_t *cmd, int msec );
+void CL_WebXRBeginEye( int eye );
+void CL_WebXREndEye( int eye );
+#endif
 
 void CL_VerifyCode( void );
 

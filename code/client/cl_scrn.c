@@ -574,6 +574,21 @@ void SCR_UpdateScreen( void ) {
 	{
 		// XXX
 		int in_anaglyphMode = Cvar_VariableIntegerValue("r_anaglyphMode");
+#ifdef __EMSCRIPTEN__
+		if ( CL_WebXRActive( ) ) {
+			// in a VR headset: a whole frame per eye, each copied out by the page
+			int eye;
+
+			for ( eye = 0; eye < 2; eye++ ) {
+				CL_WebXRBeginEye( eye );
+				SCR_DrawScreenField( STEREO_CENTER );
+				re.EndFrame( NULL, NULL );
+				CL_WebXREndEye( eye );
+			}
+			recursive = 0;
+			return;
+		}
+#endif
 		// if running in stereo, we need to draw the frame twice
 		if ( cls.glconfig.stereoEnabled || in_anaglyphMode) {
 			SCR_DrawScreenField( STEREO_LEFT );

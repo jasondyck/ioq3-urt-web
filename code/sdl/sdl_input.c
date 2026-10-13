@@ -1309,7 +1309,8 @@ void IN_Frame( void )
 		EmscriptenPointerlockChangeEvent pl;
 		qboolean locked = emscripten_get_pointerlock_status( &pl ) == EMSCRIPTEN_RESULT_SUCCESS && pl.isActive;
 
-		if( wasLocked && !locked && mouseActive && clc.state == CA_ACTIVE )
+		// (entering VR drops pointer lock too)
+		if( wasLocked && !locked && mouseActive && clc.state == CA_ACTIVE && !CL_WebXRActive( ) )
 			lostTime = Sys_Milliseconds( );
 		else if( locked )
 			lostTime = 0;
@@ -1324,6 +1325,8 @@ void IN_Frame( void )
 		}
 		wasLocked = locked;
 	}
+
+	CL_WebXRFrame( );
 #endif
 
 	// Set event time for next frame to earliest possible time an event could happen
